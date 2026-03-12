@@ -105,4 +105,88 @@ router.get('/:username', async (req, res) => {
   }
 });
 
+
+// FOLLOW USER
+router.post('/:userId/follow', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const targetUserId = req.params.userId;
+
+    if (userId === targetUserId) {
+      return res.status(400).json({ error: 'Cannot follow yourself' });
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    const currentUser = await User.findById(userId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if already following
+    if (targetUser.followers.includes(userId)) {
+      return res.status(400).json({ error: 'Already following' });
+    }
+
+    // Add follower to target user
+    targetUser.followers.push(userId);
+    await targetUser.save();
+
+    // Add to current user's following
+    currentUser.following.push(targetUserId);
+    await currentUser.save();
+
+    res.json({ message: 'User followed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// UNFOLLOW USER
+router.delete('/:userId/follow', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const targetUserId = req.params.userId;
+
+    const targetUser = await User.findById(targetUserId);
+    const currentUser = await User.findById(userId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Remove follower from target user
+    targetUser.followers = targetUser.followers.filter(
+      id => id.toString() !== userId
+    );
+    await targetUser.save();
+
+    // Remove from current user's following
+    currentUser.following = currentUser.following.filter(
+      id => id.toString() !== targetUserId
+    );
+    await currentUser.save();
+
+    res.json({ message: 'User unfollowed' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// SEARCH USERS
+router.get('/search/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    const users = await User.find({
+      username: { $regex: query, $options: 'i' }
+    }).select('-password').limit(10);
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 module.exports = router;
+
